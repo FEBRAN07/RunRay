@@ -61,20 +61,10 @@ Texture2D playerTextureJumping;
 Texture2D playerTextureMov;
 Texture2D playerTextureCrouchMov;
 Texture2D groundTexture;
-Texture2D background;
+Texture2D backgroundTexture;
 Texture2D obstacleBirdTexture;
 Texture2D obstacleSqrTexture;
 Texture2D obstacleRecTexture;
-Image playerImageStanding;
-Image playerImageCrouch;
-Image playerImageFalling;
-Image playerImageJumping;
-Image playerImageMov;
-Image playerImageCrouchMov;
-Image groundImage;
-Image obstacleBirdImage;
-Image obstacleSqrImage;
-Image obstacleRecImage;
 Score pontos = {1200, 100, 0};
 Score highScore = {100, 100, 0};
 
@@ -95,8 +85,7 @@ void DrawObstacle(Obstacle obs);
 void DrawHUD();
 void HandleObstacleCollision(Player* p, Rectangle* obstacle);
 void ChangeObstacle(Rectangle* obs_1, Rectangle* obs_2, Rectangle* obs_3);
-void GetTexture(Image sprite, int newWidth, int newHeight, Texture* texture,
-                char* fileName);
+void GetTexture(int newWidth, int newHeight, Texture* sprite, char* fileName);
 void InitAudio();
 void InitGame();
 void InitTextures();
@@ -180,63 +169,33 @@ void InitAudio() {
   somPulo = LoadSound("audio/jumping.wav");
 }
 
-void GetTexture(Image sprite, int newWidth, int newHeight, Texture* texture,
-                char* fileName) {
-  sprite = LoadImage(fileName);
-  ImageResize(&sprite, newWidth, newHeight);
-  *texture = LoadTextureFromImage(sprite);
-  UnloadImage(sprite);
+void GetTexture(int newWidth, int newHeight, Texture* sprite, char* fileName) {
+  Image img = LoadImage(fileName);
+  ImageResize(&img, newWidth, newHeight);
+  *sprite = LoadTextureFromImage(img);
+  UnloadImage(img);
 }
 
 void InitTextures() {
-  GetTexture(playerImageStanding, PLAYER_SPRITE_WIDTH_HEIGHT,
-             PLAYER_SPRITE_WIDTH_HEIGHT, &playerTextureStanding,
-             "resources/sprite.png");
-  GetTexture(playerImageJumping, PLAYER_SPRITE_WIDTH_HEIGHT,
-             PLAYER_SPRITE_WIDTH_HEIGHT, &playerTextureJumping,
-             "resources/sprite_pulando.png");
-  GetTexture(playerImageCrouch, PLAYER_SPRITE_WIDTH_HEIGHT,
-             PLAYER_SPRITE_WIDTH_HEIGHT, &playerTextureCrouch,
-             "resources/sprite_agachado.png");
-  GetTexture(playerImageCrouchMov, PLAYER_SPRITE_WIDTH_HEIGHT,
-             PLAYER_SPRITE_WIDTH_HEIGHT, &playerTextureCrouchMov,
+  GetTexture(PLAYER_SPRITE_WIDTH_HEIGHT, PLAYER_SPRITE_WIDTH_HEIGHT,
+             &playerTextureStanding, "resources/sprite.png");
+  GetTexture(PLAYER_SPRITE_WIDTH_HEIGHT, PLAYER_SPRITE_WIDTH_HEIGHT,
+             &playerTextureJumping, "resources/sprite_pulando.png");
+  GetTexture(PLAYER_SPRITE_WIDTH_HEIGHT, PLAYER_SPRITE_WIDTH_HEIGHT,
+             &playerTextureCrouch, "resources/sprite_agachado.png");
+  GetTexture(PLAYER_SPRITE_WIDTH_HEIGHT, PLAYER_SPRITE_WIDTH_HEIGHT,
+             &playerTextureCrouchMov,
              "resources/sprite_agachado_movimento.png");
-  GetTexture(playerImageMov, PLAYER_SPRITE_WIDTH_HEIGHT,
-             PLAYER_SPRITE_WIDTH_HEIGHT, &playerTextureMov,
-             "resources/sprite_movimento.png");
-  GetTexture(playerImageFalling, PLAYER_SPRITE_WIDTH_HEIGHT,
-             PLAYER_SPRITE_WIDTH_HEIGHT, &playerTextureFalling,
-             "resources/sprite_caindo.png");
-  GetTexture(groundImage, 2000, 150, &groundTexture,
-             "resources/sprite_chao.jpeg");
-  GetTexture(obstacleBirdImage, 250, 150, &obstacleBirdTexture,
-             "resources/berdly.png");
-  GetTexture(obstacleSqrImage, 200, 200, &obstacleSqrTexture,
-             "resources/arvore.png");
-  GetTexture(obstacleRecImage, 400, 300, &obstacleRecTexture,
-             "resources/duas_arvores.png");
-  background = LoadTexture("resources/sprite_background.jpeg");
-}
-
-void UnloadAudio() {
-  UnloadMusicStream(musicaFundo);
-  UnloadSound(somInicio);
-  UnloadSound(somGameOver);
-  UnloadSound(somPulo);
-}
-
-void UnloadTextures() {
-  UnloadTexture(playerTextureStanding);
-  UnloadTexture(playerTextureCrouch);
-  UnloadTexture(playerTextureCrouchMov);
-  UnloadTexture(playerTextureJumping);
-  UnloadTexture(playerTextureFalling);
-  UnloadTexture(playerTextureMov);
-  UnloadTexture(groundTexture);
-  UnloadTexture(background);
-  UnloadTexture(obstacleBirdTexture);
-  UnloadTexture(obstacleSqrTexture);
-  UnloadTexture(obstacleRecTexture);
+  GetTexture(PLAYER_SPRITE_WIDTH_HEIGHT, PLAYER_SPRITE_WIDTH_HEIGHT,
+             &playerTextureMov, "resources/sprite_movimento.png");
+  GetTexture(PLAYER_SPRITE_WIDTH_HEIGHT, PLAYER_SPRITE_WIDTH_HEIGHT,
+             &playerTextureFalling, "resources/sprite_caindo.png");
+  GetTexture(2000, 150, &groundTexture, "resources/sprite_chao.jpeg");
+  GetTexture(250, 150, &obstacleBirdTexture, "resources/berdly.png");
+  GetTexture(200, 200, &obstacleSqrTexture, "resources/arvore.png");
+  GetTexture(400, 300, &obstacleRecTexture, "resources/duas_arvores.png");
+  GetTexture(screenWidth, screenHeight, &backgroundTexture,
+             "resources/sprite_background.jpeg");
 }
 
 void UpdateFrame(Player* p, Rectangle* obstacle) {
@@ -247,16 +206,6 @@ void UpdateFrame(Player* p, Rectangle* obstacle) {
   HandleInput(p);
   UpdateGravity(p);
   HandleObstacleCollision(p, obstacle);
-}
-
-void ResetGame(Player* p, Rectangle* obstacle) {
-  if (IsKeyPressed(KEY_R)) {
-    ResetPlayer(p);
-    ResetObstacle(obstacle);
-    ResetScore();
-    PlayMusicStream(musicaFundo);
-    loseFlag = false;
-  }
 }
 
 void HandleInput(Player* p) {
@@ -311,6 +260,24 @@ void UpdateScore() {
   pontos.score += 1;
 }
 
+void HandleObstacleCollision(Player* p, Rectangle* obstacle) {
+  if (CheckCollisionCircleRec(p->position, p->radius, *obstacle)) {
+    loseFlag = true;
+    StopMusicStream(musicaFundo);
+    PlaySound(somGameOver);
+  }
+}
+
+void ResetGame(Player* p, Rectangle* obstacle) {
+  if (IsKeyPressed(KEY_R)) {
+    ResetPlayer(p);
+    ResetObstacle(obstacle);
+    ResetScore();
+    PlayMusicStream(musicaFundo);
+    loseFlag = false;
+  }
+}
+
 void ResetPlayer(Player* p) {
   p->position.x = DEFAULT_PLAYER_POS_X;
   p->position.y = DEFAULT_PLAYER_POS_Y;
@@ -330,12 +297,19 @@ void ResetScore() {
   pontos.score = 0;
 }
 
-void HandleObstacleCollision(Player* p, Rectangle* obstacle) {
-  if (CheckCollisionCircleRec(p->position, p->radius, *obstacle)) {
-    loseFlag = true;
-    StopMusicStream(musicaFundo);
-    PlaySound(somGameOver);
+void ChangeObstacle(Rectangle* obsSqr, Rectangle* obsRec, Rectangle* obsBird) {
+  int random = GetRandomValue(0, 90);
+  if (random <= 30) {
+    obstacle.recPtr = obsSqr;
+    obstacle.texturePtr = &obstacleSqrTexture;
+  } else if (random > 30 && random <= 60) {
+    obstacle.recPtr = obsRec;
+    obstacle.texturePtr = &obstacleRecTexture;
+  } else {
+    obstacle.recPtr = obsBird;
+    obstacle.texturePtr = &obstacleBirdTexture;
   }
+  obstacleSwitch = false;
 }
 
 void DrawFrame(Player* p, Obstacle obs) {
@@ -349,7 +323,7 @@ void DrawFrame(Player* p, Obstacle obs) {
 
 void DrawScenery() {
   ClearBackground(SKYBLUE);
-  DrawTexture(background, 0, 0, WHITE);
+  DrawTexture(backgroundTexture, 0, 0, WHITE);
   DrawTexture(groundTexture, groundPosx + GROUND_END, ground, WHITE);
 }
 
@@ -409,17 +383,23 @@ void DrawHUD() {
   }
 }
 
-void ChangeObstacle(Rectangle* obsSqr, Rectangle* obsRec, Rectangle* obsBird) {
-  int random = GetRandomValue(0, 90);
-  if (random <= 30) {
-    obstacle.recPtr = obsSqr;
-    obstacle.texturePtr = &obstacleSqrTexture;
-  } else if (random > 30 && random <= 60) {
-    obstacle.recPtr = obsRec;
-    obstacle.texturePtr = &obstacleRecTexture;
-  } else {
-    obstacle.recPtr = obsBird;
-    obstacle.texturePtr = &obstacleBirdTexture;
-  }
-  obstacleSwitch = false;
+void UnloadAudio() {
+  UnloadMusicStream(musicaFundo);
+  UnloadSound(somInicio);
+  UnloadSound(somGameOver);
+  UnloadSound(somPulo);
+}
+
+void UnloadTextures() {
+  UnloadTexture(playerTextureStanding);
+  UnloadTexture(playerTextureCrouch);
+  UnloadTexture(playerTextureCrouchMov);
+  UnloadTexture(playerTextureJumping);
+  UnloadTexture(playerTextureFalling);
+  UnloadTexture(playerTextureMov);
+  UnloadTexture(groundTexture);
+  UnloadTexture(backgroundTexture);
+  UnloadTexture(obstacleBirdTexture);
+  UnloadTexture(obstacleSqrTexture);
+  UnloadTexture(obstacleRecTexture);
 }
