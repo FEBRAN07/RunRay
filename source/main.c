@@ -2,17 +2,29 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define OBS_OFFSET -75
 #define MIN_OBS_SPEED 25
 #define DEFAULT_PLAYER_POS_X 500
 #define DEFAULT_PLAYER_POS_Y 700
 #define PLAYER_RADIUS 50
+#define JUMP_HEIGHT 250
 #define PLAYER_SPRITE_WIDTH_HEIGHT 225
+#define DEFAULT_SPRITE_OFFSET_X 2
+#define DEFAULT_SPRITE_OFFSET_Y 2.5f
+#define SPRITE_CROUCH_OFFSET_X 3.5f
+#define SPRITE_CROUCH_OFFSET_Y 6.25f
 #define GROUND_END -200
+
+typedef struct PlayerState {
+  bool isGrounded;
+  bool isCrouched;
+} PlayerState;
 
 typedef struct Player {
   Vector2 position;
   Vector2 speed;
   int radius;
+  PlayerState state;
 } Player;
 
 typedef struct Score {
@@ -35,8 +47,6 @@ int obstacleSpeed = MIN_OBS_SPEED;
 int timePassed = 0;
 const float gravity = 0.5f;
 bool gameStart = false;
-bool canJump = true;
-bool isCrouched = false;
 bool loseFlag = false;
 bool obstacleSwitch = false;
 Obstacle obstacle;
@@ -91,13 +101,18 @@ void InitAudio();
 void InitGame();
 void InitTextures();
 void UnloadAudio();
-void UnloadImages();
 void UnloadTextures();
 
 int main() {
   // Initialization
   //--------------------------------------------------------------------------------------
-  Player p = {DEFAULT_PLAYER_POS_X, DEFAULT_PLAYER_POS_Y, 0, 0, PLAYER_RADIUS};
+  Player p = {DEFAULT_PLAYER_POS_X,
+              DEFAULT_PLAYER_POS_Y,
+              0,
+              0,
+              PLAYER_RADIUS,
+              true,
+              false};
 
   Rectangle obstacleSqr = {obstaclePosx, ground - 125, 125, 125};
   Rectangle obstacleRec = {obstaclePosx, ground - 100, 300, 100};
@@ -143,7 +158,6 @@ int main() {
   //--------------------------------------------------------------------------------------
   UnloadAudio();
   UnloadTextures();
-  UnloadImages();
   CloseAudioDevice();
   CloseWindow();
   //--------------------------------------------------------------------------------------
@@ -171,6 +185,7 @@ void GetTexture(Image sprite, int newWidth, int newHeight, Texture* texture,
   sprite = LoadImage(fileName);
   ImageResize(&sprite, newWidth, newHeight);
   *texture = LoadTextureFromImage(sprite);
+  UnloadImage(sprite);
 }
 
 void InitTextures() {
@@ -196,7 +211,8 @@ void InitTextures() {
              "resources/sprite_chao.jpeg");
   GetTexture(obstacleBirdImage, 250, 150, &obstacleBirdTexture,
              "resources/berdly.png");
-  obstacleSqrTexture = LoadTexture("resources/arvore.png");
+  GetTexture(obstacleSqrImage, 200, 200, &obstacleSqrTexture,
+             "resources/arvore.png");
   GetTexture(obstacleRecImage, 400, 300, &obstacleRecTexture,
              "resources/duas_arvores.png");
   background = LoadTexture("resources/sprite_background.jpeg");
@@ -208,17 +224,7 @@ void UnloadAudio() {
   UnloadSound(somGameOver);
   UnloadSound(somPulo);
 }
-void UnloadImages() {
-  UnloadImage(playerImageStanding);
-  UnloadImage(playerImageCrouch);
-  UnloadImage(playerImageCrouchMov);
-  UnloadImage(playerImageJumping);
-  UnloadImage(playerImageFalling);
-  UnloadImage(playerImageMov);
-  UnloadImage(obstacleBirdImage);
-  UnloadImage(obstacleSqrImage);
-  UnloadImage(obstacleRecImage);
-}
+
 void UnloadTextures() {
   UnloadTexture(playerTextureStanding);
   UnloadTexture(playerTextureCrouch);
@@ -254,19 +260,20 @@ void ResetGame(Player* p, Rectangle* obstacle) {
 }
 
 void HandleInput(Player* p) {
-  if ((IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_SPACE)) && canJump == true) {
-    canJump = false;
-    p->speed.y = 250;
+  if ((IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_SPACE)) &&
+      p->state.isGrounded == true) {
+    p->state.isGrounded = false;
+    p->speed.y = JUMP_HEIGHT;
     p->position.y -= p->speed.y;
     p->speed.y = 0;
     PlaySound(somPulo);
   }
-  if (IsKeyDown(KEY_DOWN) && canJump == true) {
+  if (IsKeyDown(KEY_DOWN) && p->state.isGrounded == true) {
     p->radius = PLAYER_RADIUS / 2;
-    isCrouched = true;
+    p->state.isCrouched = true;
   } else {
     p->radius = PLAYER_RADIUS;
-    isCrouched = false;
+    p->state.isCrouched = false;
   }
 }
 
@@ -276,7 +283,7 @@ void UpdateGravity(Player* p) {
   if (p->position.y > ground - p->radius) {
     p->speed.y = 0;
     p->position.y = ground - p->radius;
-    canJump = true;
+    p->state.isGrounded = true;
   }
 }
 
@@ -289,7 +296,7 @@ void UpdateGround() {
 void UpdateObstacle(Rectangle* obstacle) {
   obstacle->x = obstaclePosx;
   obstaclePosx -= obstacleSpeed;
-  if (obstaclePosx <= -75 - obstacle->width) {
+  if (obstaclePosx <= OBS_OFFSET - obstacle->width) {
     obstaclePosx = screenWidth;
     obstacleSwitch = true;
   }
@@ -347,29 +354,36 @@ void DrawScenery() {
 }
 
 void DrawPlayer(Player* p) {
-  if (isCrouched) {
+  if (p->state.isCrouched) {
     if (timePassed % 6) {
-      DrawTexture(playerTextureCrouchMov, p->position.x - p->radius * 3.5,
-                  p->position.y - p->radius * 6.25, WHITE);
+      DrawTexture(playerTextureCrouchMov,
+                  p->position.x - p->radius * SPRITE_CROUCH_OFFSET_X,
+                  p->position.y - p->radius * SPRITE_CROUCH_OFFSET_Y, WHITE);
     } else
-      DrawTexture(playerTextureCrouch, p->position.x - p->radius * 3.5,
-                  p->position.y - p->radius * 6.25, WHITE);
-  } else if (canJump) {
+      DrawTexture(playerTextureCrouch,
+                  p->position.x - p->radius * SPRITE_CROUCH_OFFSET_X,
+                  p->position.y - p->radius * SPRITE_CROUCH_OFFSET_Y, WHITE);
+  } else if (p->state.isGrounded) {
     if (timePassed % 8 == 0) {
-      DrawTexture(playerTextureMov, p->position.x - p->radius * 2,
-                  p->position.y - p->radius * 2.5, WHITE);
+      DrawTexture(playerTextureMov,
+                  p->position.x - p->radius * DEFAULT_SPRITE_OFFSET_X,
+                  p->position.y - p->radius * DEFAULT_SPRITE_OFFSET_Y, WHITE);
     } else
-      DrawTexture(playerTextureStanding, p->position.x - p->radius * 2,
-                  p->position.y - p->radius * 2.5, WHITE);
+      DrawTexture(playerTextureStanding,
+                  p->position.x - p->radius * DEFAULT_SPRITE_OFFSET_X,
+                  p->position.y - p->radius * DEFAULT_SPRITE_OFFSET_Y, WHITE);
   } else if (p->speed.y < 5)
-    DrawTexture(playerTextureJumping, p->position.x - p->radius * 2,
-                p->position.y - p->radius * 2.5, WHITE);
+    DrawTexture(playerTextureJumping,
+                p->position.x - p->radius * DEFAULT_SPRITE_OFFSET_X,
+                p->position.y - p->radius * DEFAULT_SPRITE_OFFSET_Y, WHITE);
   else if (p->speed.y < 10)
-    DrawTexture(playerTextureMov, p->position.x - p->radius * 2,
-                p->position.y - p->radius * 2.5, WHITE);
+    DrawTexture(playerTextureMov,
+                p->position.x - p->radius * DEFAULT_SPRITE_OFFSET_X,
+                p->position.y - p->radius * DEFAULT_SPRITE_OFFSET_Y, WHITE);
   else
-    DrawTexture(playerTextureFalling, p->position.x - p->radius * 2,
-                p->position.y - p->radius * 2.5, WHITE);
+    DrawTexture(playerTextureFalling,
+                p->position.x - p->radius * DEFAULT_SPRITE_OFFSET_X,
+                p->position.y - p->radius * DEFAULT_SPRITE_OFFSET_Y, WHITE);
 }
 
 void DrawObstacle(Obstacle obs) {
